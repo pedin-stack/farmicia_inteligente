@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dashboard.dart';
+import '../services/api_service.dart'; 
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -14,6 +15,9 @@ class _LoginPageState extends State<LoginPage> {
 
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  
+  // Instancia o serviço
+  final ApiService _apiService = ApiService();
 
   bool _isLoading = false;
   bool _obscurePassword = true;
@@ -23,6 +27,60 @@ class _LoginPageState extends State<LoginPage> {
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  // Lógica de Login Conectada ao Back-end
+  Future<void> _handleLogin() async {
+    final email = _emailController.text.trim();
+    final senha = _passwordController.text.trim();
+
+    // 1. Validação Local (UI)
+    if (email.isEmpty || !email.contains('@')) {
+      _showError("Insira um e-mail válido!");
+      return;
+    }
+    if (senha.length < 3) { // Ajuste conforme sua regra de negócio
+      _showError("A senha é muito curta!");
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      // 2. Chamada ao Back-end
+      final bool isLoggedIn = await _apiService.login(email, senha);
+
+      if (!mounted) return;
+
+      if (isLoggedIn) {
+        // Sucesso: Vai para o Dashboard
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const DashboardPage()),
+        );
+      } else {
+        // Falha: Credenciais inválidas (retornado pelo Java)
+        _showError("E-mail ou senha incorretos.");
+      }
+    } catch (e) {
+      // Erro de rede ou servidor desligado
+      _showError("Erro de conexão. Verifique se o servidor está rodando.");
+      print(e);
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  void _showError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+      ),
+    );
   }
 
   @override
@@ -97,31 +155,7 @@ class _LoginPageState extends State<LoginPage> {
                         width: double.infinity,
                         height: 48,
                         child: ElevatedButton(
-                          onPressed: _isLoading
-                              ? null
-                              : () {
-                                  setState(() {
-                                    _isLoading = true;
-                                  });
-                              
-                                  Future.delayed(
-                                    const Duration(seconds: 0),
-                                    () {
-                                      if (mounted) {
-                                        setState(() {
-                                          _isLoading = false;
-                                        });
-                                        Navigator.pushReplacement(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) =>
-                                                const DashboardPage(),
-                                          ),
-                                        );
-                                      }
-                                    },
-                                  );
-                                },
+                          onPressed: _isLoading ? null : _handleLogin, // Chama a função nova
                           style: ElevatedButton.styleFrom(
                             backgroundColor: brandColor,
                             foregroundColor: Colors.white,
