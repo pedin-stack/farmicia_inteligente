@@ -4,6 +4,7 @@ import '../widgets/dialogs/ConfirmExcludeDialog.dart';
 import '../widgets/dialogs/EditMedicineDialog.dart';
 import 'package:farmicia_inteligente/widgets/chat_assistant.dart';
 import 'package:farmicia_inteligente/widgets/tabela_remedios.dart';
+import 'package:farmicia_inteligente/services/api_service.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -13,105 +14,107 @@ class DashboardPage extends StatefulWidget {
 }
 
 class _DashboardPageState extends State<DashboardPage> {
-  // Cores do Projeto
+  // Cores
   final Color brandColor = const Color(0xFF7F56D9);
   final Color bgLight = const Color(0xFFF0F2F5);
   final Color successColor = const Color(0xFF52C41A);
   final Color errorColor = const Color(0xFFCF1322);
 
-  // Dados (Estado da Tela)
-  // Nota: Em um app real, isso viria de um banco de dados ou Provider
-  final List<Map<String, dynamic>> _dadosVisuais = [
-    {
-      'id': 1,
-      'nome': 'João Silva',
-      'itens': [
-        {'remedio': 'Losartana 50mg', 'quantidade': 10, 'consumo': 1, 'proximaCompra': '25/01', 'status': 'urgente', 'horario': '08:00'},
-        {'remedio': 'Aspirina', 'quantidade': 45, 'consumo': 2, 'proximaCompra': '10/02', 'status': 'normal', 'horario': '20:00'},
-      ]
-    },
-    {
-      'id': 2,
-      'nome': 'Maria Oliveira',
-      'itens': <Map<String, dynamic>>[]
-    },
-  ];
+  // --- Estado e Backend (Lógica do Colega) ---
+  final ApiService _apiService = ApiService();
+  List<Remedio> _listaRemedios = []; // Usando o Model dele
+  int _totalPessoasReal = 0;
+  bool _isLoading = true;
 
-
-  int get totalMedicamentos {
-    int total = 0;
-    for (var pessoa in _dadosVisuais) {
-      total += (pessoa['itens'] as List).length;
-    }
-    return total;
+  @override
+  void initState() {
+    super.initState();
+    _carregarDados();
   }
 
-  int get totalPessoas => _dadosVisuais.length;
+  // 1. Carregar Dados da API
+  Future<void> _carregarDados() async {
+    try {
+      setState(() => _isLoading = true);
+      
+      final lista = await _apiService.getRemedios();
+      final qtdPessoas = await _apiService.getQuantidadePessoas(); 
 
-  int get totalUrgentes {
-    int total = 0;
-    for (var pessoa in _dadosVisuais) {
-      for (var item in pessoa['itens']) {
-        if (item['status'] == 'urgente') total++;
+      if (mounted) {
+        setState(() {
+          _listaRemedios = lista;
+          _totalPessoasReal = qtdPessoas;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      print("Erro ao carregar: $e");
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  // 2. Criar Pessoa na API
+  Future<void> _criarPessoa(String nome) async {
+    try {
+      // Exibe loading rápido ou feedback
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Salvando pessoa...")));
+      
+      await _apiService.createPessoa(nome);
+      
+      await _carregarDados(); // Atualiza a tela
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Pessoa criada com sucesso!")));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Erro: $e"), backgroundColor: Colors.red));
       }
     }
-    return total;
   }
 
-  void _adicionarPessoa(String nome) {
-    setState(() {
-      _dadosVisuais.add({
-        'id': DateTime.now().millisecondsSinceEpoch, // ID único temporário
-        'nome': nome,
-        'itens': <Map<String, dynamic>>[],
-      });
-    });
-  }
-
-  void _removerPessoa(Map<String, dynamic> pessoa) {
-    setState(() {
-      _dadosVisuais.remove(pessoa);
-    });
-  }
-
-  void _adicionarRemedio(Map<String, dynamic> pessoa, Map<String, dynamic> novoItem) {
-    setState(() {
-      // Simulação simples de status baseada na quantidade (apenas exemplo)
-      if ((novoItem['quantidade'] as int) < 15) {
-        novoItem['status'] = 'urgente';
+  // 3. Salvar/Editar Remédio na API
+  Future<void> _salvarRemedio(Remedio remedio) async {
+    try {
+      if (remedio.id != null) {
+        await _apiService.updateRemedio(remedio); // PUT
       } else {
-        novoItem['status'] = 'normal';
+        await _apiService.addRemedio(remedio); // POST
       }
-      (pessoa['itens'] as List).add(novoItem);
-    });
+      
+      await _carregarDados(); // Refresh
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Medicamento salvo!")));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Erro: $e"), backgroundColor: Colors.red));
+      }
+    }
   }
 
-  void _editarRemedio(Map<String, dynamic> pessoa, Map<String, dynamic> itemAntigo, Map<String, dynamic> itemEditado) {
-    setState(() {
-      final lista = (pessoa['itens'] as List);
-      final index = lista.indexOf(itemAntigo);
-      if (index != -1) {
-        // Recalcula status
-        if ((itemEditado['quantidade'] as int) < 15) {
-          itemEditado['status'] = 'urgente';
-        } else {
-          itemEditado['status'] = 'normal';
-        }
-        lista[index] = itemEditado;
+  // 4. Deletar Remédio da API
+  Future<void> _deletarRemedio(int id) async {
+    try {
+      await _apiService.deleteRemedio(id);
+      await _carregarDados();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Item removido.")));
       }
-    });
-  }
-
-  void _removerRemedio(Map<String, dynamic> pessoa, Map<String, dynamic> item) {
-    setState(() {
-      (pessoa['itens'] as List).remove(item);
-    });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Erro ao deletar: $e"), backgroundColor: Colors.red));
+      }
+    }
   }
 
   // --- Construção da UI ---
 
   @override
   Widget build(BuildContext context) {
+    // Cálculos estatísticos baseados na lista real
+    final int totalMedicamentos = _listaRemedios.length;
+    final int totalUrgentes = _listaRemedios.where((r) => r.status?.toUpperCase() == 'URGENTE').length;
+
     return Scaffold(
       backgroundColor: bgLight,
       appBar: AppBar(
@@ -125,67 +128,73 @@ class _DashboardPageState extends State<DashboardPage> {
         ],
       ),
       floatingActionButton: const ChatAssistant(),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text("Visão Geral", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            const Text("Cálculo automático de reposição", style: TextStyle(color: Colors.grey, fontSize: 14)),
-            const SizedBox(height: 16),
-
-            // CARDS DE ESTATÍSTICAS (Atualizam dinamicamente)
-            Row(
+      body: _isLoading 
+        ? const Center(child: CircularProgressIndicator()) 
+        : SingleChildScrollView(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildStatCard("Medicamentos", "$totalMedicamentos", Icons.medication_outlined, brandColor),
-                const SizedBox(width: 8),
-                _buildStatCard("Pessoas", "$totalPessoas", Icons.people_outline, successColor),
-                const SizedBox(width: 8),
-                _buildStatCard("Urgente", "$totalUrgentes itens", Icons.warning_amber_rounded, errorColor, textColor: errorColor),
-              ],
-            ),
+                const Text("Visão Geral", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                const Text("Conectado ao servidor", style: TextStyle(color: Colors.grey, fontSize: 14)),
+                const SizedBox(height: 16),
 
-            const SizedBox(height: 24),
+                // Cards de Estatísticas
+                Row(
+                  children: [
+                    _buildStatCard("Medicamentos", "$totalMedicamentos", Icons.medication_outlined, brandColor),
+                    const SizedBox(width: 8),
+                    _buildStatCard("Pessoas", "$_totalPessoasReal", Icons.people_outline, successColor),
+                    const SizedBox(width: 8),
+                    _buildStatCard("Urgente", "$totalUrgentes itens", Icons.warning_amber_rounded, errorColor, textColor: errorColor),
+                  ],
+                ),
 
-            // BOTÃO NOVA PESSOA
-            Center(
-              child: SizedBox(
-                height: 48,
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    showDialog(
-                      context: context,
-                      builder: (context) => AddPersonDialog(
-                        onSave: (nome) => _adicionarPessoa(nome),
+                const SizedBox(height: 24),
+
+                // Botão Nova Pessoa (Usando o Componente AddPersonDialog)
+                Center(
+                  child: SizedBox(
+                    height: 48,
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        showDialog(
+                          context: context,
+                          builder: (context) => AddPersonDialog(
+                            onSave: (nome) {
+                              // Conecta o callback do Dialog à função da API
+                              _criarPessoa(nome); 
+                            },
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.add),
+                      label: const Text("Nova Pessoa"),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: brandColor,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       ),
-                    );
-                  },
-                  icon: const Icon(Icons.add),
-                  label: const Text("Nova Pessoa"),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: brandColor,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
                   ),
                 ),
-              ),
-            ),
 
-            const SizedBox(height: 24),
+                const SizedBox(height: 24),
 
-            // LISTA DE PESSOAS E TABELAS
-            Column(
-              children: _dadosVisuais.map((pessoa) => Padding(
-                padding: const EdgeInsets.only(bottom: 16),
-                child: _buildPersonCard(pessoa),
-              )).toList(),
+                // Lista de Itens (Adaptando a lista plana do backend para o visual de Card)
+                // Nota: Se o backend retornar lista plana, agrupamos visualmente em um card "Geral"
+                // ou iteramos sobre as pessoas se o backend suportar isso. 
+                // Assumindo lista plana de remédios por enquanto:
+                _buildPersonCard({
+                  'nome': 'Estoque Geral',
+                  'itens': _listaRemedios.map((r) => r.toMap()).toList(), // Converte Model -> Map para a Tabela
+                }),
+
+                const SizedBox(height: 80),
+              ],
             ),
-            
-            const SizedBox(height: 80), // Espaço para o FAB não cobrir conteúdo
-          ],
-        ),
-      ),
+          ),
     );
   }
 
@@ -236,7 +245,6 @@ class _DashboardPageState extends State<DashboardPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // CABEÇALHO DO CARD (Nome + Delete Pessoa)
             Row(
               children: [
                 CircleAvatar(
@@ -248,64 +256,84 @@ class _DashboardPageState extends State<DashboardPage> {
                 Expanded(
                   child: Text(pessoa['nome'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                 ),
+                // Botão Excluir Pessoa (Lógica opcional se houver endpoint para isso)
                 IconButton(
                   icon: const Icon(Icons.delete_outline, color: Colors.red),
                   onPressed: () {
-                    showDialog(
-                      context: context,
-                      builder: (context) => ConfirmExcludeDialog(
-                        titulo: "Excluir Pessoa?",
-                        conteudo: "Tem certeza que deseja remover ${pessoa['nome']} e todos os seus medicamentos?",
-                        onConfirm: () {
-                          _removerPessoa(pessoa);
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Pessoa removida!")));
-                        },
-                      ),
-                    );
+                     // Adicione lógica de excluir pessoa aqui se o backend suportar
+                     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Funcionalidade em desenvolvimento no backend")));
                   },
                 ),
               ],
             ),
             const Divider(height: 24),
             
-            // TABELA DE REMÉDIOS
+            // Tabela de Remédios
             TabelaRemedios(
               dados: pessoa['itens'],
               
-              // ADICIONAR REMÉDIO
+              // 1. ADICIONAR (Abre Dialog -> Converte Map p/ Model -> Chama API)
               onAdd: () {
                 showDialog(
                   context: context,
                   builder: (context) => EditMedicineDialog(
                     nomePessoa: pessoa['nome'],
                     itemParaEditar: null,
-                    onSave: (novoItem) => _adicionarRemedio(pessoa, novoItem),
+                    onSave: (novoItemMap) {
+                      // Conversão Map -> Model Remedio
+                      // O EditMedicineDialog retorna um Map com strings/ints.
+                      // Precisamos garantir que o Model do seu colega aceite isso.
+                      final novoRemedio = Remedio(
+                        nome: novoItemMap['remedio'],
+                        quantidade: novoItemMap['quantidade'],
+                        usoDiario: double.tryParse(novoItemMap['consumo'].toString()) ?? 0.0,
+                        proximaCompra: novoItemMap['proximaCompra'],
+                        horario: novoItemMap['horario'],
+                        status: 'NORMAL', // Default
+                      );
+                      
+                      _salvarRemedio(novoRemedio);
+                    },
                   ),
                 );
               },
               
-              // EDITAR REMÉDIO
-              onEdit: (item) {
+              // 2. EDITAR (Abre Dialog com dados -> Converte -> Chama API)
+              onEdit: (itemMap) {
                 showDialog(
                   context: context,
                   builder: (context) => EditMedicineDialog(
                     nomePessoa: pessoa['nome'],
-                    itemParaEditar: item,
-                    onSave: (itemEditado) => _editarRemedio(pessoa, item, itemEditado),
+                    itemParaEditar: itemMap,
+                    onSave: (itemEditadoMap) {
+                      
+                      final remedioEditado = Remedio(
+                        id: itemMap['id'], // IMPORTANTE: Manter o ID original
+                        nome: itemEditadoMap['remedio'],
+                        quantidade: itemEditadoMap['quantidade'],
+                        usoDiario: double.tryParse(itemEditadoMap['consumo'].toString()) ?? 0.0,
+                        proximaCompra: itemEditadoMap['proximaCompra'],
+                        horario: itemEditadoMap['horario'],
+                        status: itemEditadoMap['status'] ?? 'NORMAL',
+                      );
+
+                      _salvarRemedio(remedioEditado);
+                    },
                   ),
                 );
               },
               
-              // EXCLUIR REMÉDIO
-              onDelete: (item) {
+              // 3. EXCLUIR (Abre ConfirmDialog -> Chama API)
+              onDelete: (itemMap) {
                  showDialog(
                     context: context,
                     builder: (context) => ConfirmExcludeDialog(
                       titulo: "Remover Medicamento?",
-                      conteudo: "Deseja remover ${item['remedio']} da lista?",
+                      conteudo: "Deseja remover ${itemMap['remedio']} da lista?",
                       onConfirm: () {
-                        _removerRemedio(pessoa, item);
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("${item['remedio']} removido!")));
+                        if (itemMap['id'] != null) {
+                          _deletarRemedio(itemMap['id']);
+                        }
                       },
                     ),
                  );
@@ -315,5 +343,20 @@ class _DashboardPageState extends State<DashboardPage> {
         ),
       ),
     );
+  }
+}
+
+// Extensão para facilitar a conversão Model -> Map (se seu colega não fez isso no model)
+extension RemedioExtension on Remedio {
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'remedio': nome,
+      'quantidade': quantidade,
+      'consumo': usoDiario, // Mapeando 'usoDiario' do Backend para 'consumo' do Frontend
+      'proximaCompra': proximaCompra,
+      'horario': horario,
+      'status': status,
+    };
   }
 }
