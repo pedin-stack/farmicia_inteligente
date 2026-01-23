@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
-import '../widgets/tabela_remedios.dart';
-import '../widgets/chat_assistant.dart';
+import '../widgets/dialogs/AddPersonDialog.dart';
+import '../widgets/dialogs/ConfirmExcludeDialog.dart';
+import '../widgets/dialogs/EditMedicineDialog.dart';
+import 'package:farmicia_inteligente/widgets/chat_assistant.dart';
+import 'package:farmicia_inteligente/widgets/tabela_remedios.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -10,19 +13,21 @@ class DashboardPage extends StatefulWidget {
 }
 
 class _DashboardPageState extends State<DashboardPage> {
+  // Cores do Projeto
   final Color brandColor = const Color(0xFF7F56D9);
   final Color bgLight = const Color(0xFFF0F2F5);
   final Color successColor = const Color(0xFF52C41A);
   final Color errorColor = const Color(0xFFCF1322);
 
-  // Dados Estáticos
+  // Dados (Estado da Tela)
+  // Nota: Em um app real, isso viria de um banco de dados ou Provider
   final List<Map<String, dynamic>> _dadosVisuais = [
     {
       'id': 1,
       'nome': 'João Silva',
       'itens': [
-        {'remedio': 'Losartana 50mg', 'quantidade': 10, 'proximaCompra': '25/01', 'status': 'urgente', 'horario': '08:00'},
-        {'remedio': 'Aspirina', 'quantidade': 45, 'proximaCompra': '10/02', 'status': 'normal', 'horario': '20:00'},
+        {'remedio': 'Losartana 50mg', 'quantidade': 10, 'consumo': 1, 'proximaCompra': '25/01', 'status': 'urgente', 'horario': '08:00'},
+        {'remedio': 'Aspirina', 'quantidade': 45, 'consumo': 2, 'proximaCompra': '10/02', 'status': 'normal', 'horario': '20:00'},
       ]
     },
     {
@@ -31,6 +36,79 @@ class _DashboardPageState extends State<DashboardPage> {
       'itens': <Map<String, dynamic>>[]
     },
   ];
+
+
+  int get totalMedicamentos {
+    int total = 0;
+    for (var pessoa in _dadosVisuais) {
+      total += (pessoa['itens'] as List).length;
+    }
+    return total;
+  }
+
+  int get totalPessoas => _dadosVisuais.length;
+
+  int get totalUrgentes {
+    int total = 0;
+    for (var pessoa in _dadosVisuais) {
+      for (var item in pessoa['itens']) {
+        if (item['status'] == 'urgente') total++;
+      }
+    }
+    return total;
+  }
+
+  void _adicionarPessoa(String nome) {
+    setState(() {
+      _dadosVisuais.add({
+        'id': DateTime.now().millisecondsSinceEpoch, // ID único temporário
+        'nome': nome,
+        'itens': <Map<String, dynamic>>[],
+      });
+    });
+  }
+
+  void _removerPessoa(Map<String, dynamic> pessoa) {
+    setState(() {
+      _dadosVisuais.remove(pessoa);
+    });
+  }
+
+  void _adicionarRemedio(Map<String, dynamic> pessoa, Map<String, dynamic> novoItem) {
+    setState(() {
+      // Simulação simples de status baseada na quantidade (apenas exemplo)
+      if ((novoItem['quantidade'] as int) < 15) {
+        novoItem['status'] = 'urgente';
+      } else {
+        novoItem['status'] = 'normal';
+      }
+      (pessoa['itens'] as List).add(novoItem);
+    });
+  }
+
+  void _editarRemedio(Map<String, dynamic> pessoa, Map<String, dynamic> itemAntigo, Map<String, dynamic> itemEditado) {
+    setState(() {
+      final lista = (pessoa['itens'] as List);
+      final index = lista.indexOf(itemAntigo);
+      if (index != -1) {
+        // Recalcula status
+        if ((itemEditado['quantidade'] as int) < 15) {
+          itemEditado['status'] = 'urgente';
+        } else {
+          itemEditado['status'] = 'normal';
+        }
+        lista[index] = itemEditado;
+      }
+    });
+  }
+
+  void _removerRemedio(Map<String, dynamic> pessoa, Map<String, dynamic> item) {
+    setState(() {
+      (pessoa['itens'] as List).remove(item);
+    });
+  }
+
+  // --- Construção da UI ---
 
   @override
   Widget build(BuildContext context) {
@@ -41,7 +119,7 @@ class _DashboardPageState extends State<DashboardPage> {
         backgroundColor: Colors.white,
         foregroundColor: Colors.black87,
         elevation: 0,
-        scrolledUnderElevation: 0, 
+        scrolledUnderElevation: 0,
         actions: [
           IconButton(icon: const Icon(Icons.logout), onPressed: () => Navigator.pop(context))
         ],
@@ -56,24 +134,33 @@ class _DashboardPageState extends State<DashboardPage> {
             const Text("Cálculo automático de reposição", style: TextStyle(color: Colors.grey, fontSize: 14)),
             const SizedBox(height: 16),
 
+            // CARDS DE ESTATÍSTICAS (Atualizam dinamicamente)
             Row(
               children: [
-                _buildStatCard("Medicamentos", "12", Icons.medication_outlined, brandColor),
+                _buildStatCard("Medicamentos", "$totalMedicamentos", Icons.medication_outlined, brandColor),
                 const SizedBox(width: 8),
-                _buildStatCard("Pessoas", "2", Icons.people_outline, successColor),
+                _buildStatCard("Pessoas", "$totalPessoas", Icons.people_outline, successColor),
                 const SizedBox(width: 8),
-                _buildStatCard("Urgente", "1 item", Icons.warning_amber_rounded, errorColor, textColor: errorColor),
+                _buildStatCard("Urgente", "$totalUrgentes itens", Icons.warning_amber_rounded, errorColor, textColor: errorColor),
               ],
             ),
 
             const SizedBox(height: 24),
 
+            // BOTÃO NOVA PESSOA
             Center(
               child: SizedBox(
                 height: 48,
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: () => _openPersonModal(),
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      builder: (context) => AddPersonDialog(
+                        onSave: (nome) => _adicionarPessoa(nome),
+                      ),
+                    );
+                  },
                   icon: const Icon(Icons.add),
                   label: const Text("Nova Pessoa"),
                   style: ElevatedButton.styleFrom(
@@ -87,52 +174,22 @@ class _DashboardPageState extends State<DashboardPage> {
 
             const SizedBox(height: 24),
 
-            Column(//uso de column para garantir o tamnanho total 
+            // LISTA DE PESSOAS E TABELAS
+            Column(
               children: _dadosVisuais.map((pessoa) => Padding(
                 padding: const EdgeInsets.only(bottom: 16),
                 child: _buildPersonCard(pessoa),
               )).toList(),
             ),
             
-            const SizedBox(height: 80),
+            const SizedBox(height: 80), // Espaço para o FAB não cobrir conteúdo
           ],
         ),
       ),
     );
   }
 
-  void _confirmarExclusao({required String titulo, required String conteudo, required VoidCallback onConfirm}) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.white, 
-        surfaceTintColor: Colors.white, 
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Text(titulo, style: const TextStyle(fontWeight: FontWeight.bold)),
-        content: Text(conteudo),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancelar", style: TextStyle(color: Colors.grey)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context); 
-              onConfirm();
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-              elevation: 0,
-            ),
-            child: const Text("Excluir"),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // --- Cards ---
+  // --- Widgets Auxiliares ---
 
   Widget _buildStatCard(String title, String value, IconData icon, Color color, {Color? textColor}) {
     return Expanded(
@@ -141,7 +198,6 @@ class _DashboardPageState extends State<DashboardPage> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
-         
           boxShadow: [
              BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2))
           ]
@@ -180,6 +236,7 @@ class _DashboardPageState extends State<DashboardPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // CABEÇALHO DO CARD (Nome + Delete Pessoa)
             Row(
               children: [
                 CircleAvatar(
@@ -191,17 +248,19 @@ class _DashboardPageState extends State<DashboardPage> {
                 Expanded(
                   child: Text(pessoa['nome'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                 ),
-             
                 IconButton(
                   icon: const Icon(Icons.delete_outline, color: Colors.red),
                   onPressed: () {
-                    _confirmarExclusao(
-                      titulo: "Excluir Pessoa?",
-                      conteudo: "Tem certeza que deseja remover ${pessoa['nome']} e todos os seus medicamentos?",
-                      onConfirm: () {
-                        
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Pessoa removida!")));
-                      }
+                    showDialog(
+                      context: context,
+                      builder: (context) => ConfirmExcludeDialog(
+                        titulo: "Excluir Pessoa?",
+                        conteudo: "Tem certeza que deseja remover ${pessoa['nome']} e todos os seus medicamentos?",
+                        onConfirm: () {
+                          _removerPessoa(pessoa);
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Pessoa removida!")));
+                        },
+                      ),
                     );
                   },
                 ),
@@ -209,152 +268,51 @@ class _DashboardPageState extends State<DashboardPage> {
             ),
             const Divider(height: 24),
             
+            // TABELA DE REMÉDIOS
             TabelaRemedios(
               dados: pessoa['itens'],
-              onAdd: () => _openMedicineModal(nomePessoa: pessoa['nome']),
-              onEdit: (item) => _openMedicineModal(nomePessoa: pessoa['nome'], itemParaEditar: item),
-           
+              
+              // ADICIONAR REMÉDIO
+              onAdd: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => EditMedicineDialog(
+                    nomePessoa: pessoa['nome'],
+                    itemParaEditar: null,
+                    onSave: (novoItem) => _adicionarRemedio(pessoa, novoItem),
+                  ),
+                );
+              },
+              
+              // EDITAR REMÉDIO
+              onEdit: (item) {
+                showDialog(
+                  context: context,
+                  builder: (context) => EditMedicineDialog(
+                    nomePessoa: pessoa['nome'],
+                    itemParaEditar: item,
+                    onSave: (itemEditado) => _editarRemedio(pessoa, item, itemEditado),
+                  ),
+                );
+              },
+              
+              // EXCLUIR REMÉDIO
               onDelete: (item) {
-                 _confirmarExclusao(
+                 showDialog(
+                    context: context,
+                    builder: (context) => ConfirmExcludeDialog(
                       titulo: "Remover Medicamento?",
                       conteudo: "Deseja remover ${item['remedio']} da lista?",
                       onConfirm: () {
-                        
+                        _removerRemedio(pessoa, item);
                         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("${item['remedio']} removido!")));
-                      }
-                    );
+                      },
+                    ),
+                 );
               },
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  // --- MODAIS COM FUNDO BRANCO ---
-
-  void _openMedicineModal({required String nomePessoa, Map<String, dynamic>? itemParaEditar}) {
-    final bool isEdit = itemParaEditar != null;
-    
-    final TextEditingController remedioController = TextEditingController(text: isEdit ? itemParaEditar['remedio'] : '');
-    final TextEditingController qtdController = TextEditingController(text: isEdit ? itemParaEditar['quantidade'].toString() : '');
-    final TextEditingController dataController = TextEditingController(text: isEdit ? itemParaEditar['proximaCompra'] : '');
-    final TextEditingController horaController = TextEditingController(text: isEdit ? itemParaEditar['horario'] : '');
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.white, 
-        surfaceTintColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Text(isEdit ? "Editar Remédio" : "Adicionar Remédio"),
-        scrollable: true,
-        content: SizedBox(
-          width: 400, 
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text("Para: $nomePessoa", style: const TextStyle(color: Colors.grey, fontSize: 13)),
-              const SizedBox(height: 16),
-              
-              _buildTextField(label: "Nome do Medicamento", controller: remedioController, icon: Icons.medication),
-              const SizedBox(height: 12),
-              
-              _buildTextField(label: "Quantidade Atual", controller: qtdController, icon: Icons.numbers, isNumber: true),
-              const SizedBox(height: 12),
-              
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildTextField(
-                      label: "Data", 
-                      controller: dataController, 
-                      icon: Icons.calendar_today,
-                      readOnly: true,
-                      onTap: () async {
-                         // Lógica de DatePicker 
-                      }
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildTextField(
-                      label: "Hora", 
-                      controller: horaController, 
-                      icon: Icons.access_time,
-                      readOnly: true,
-                      onTap: () async {
-                        // Lógica de TimePicker
-                      }
-                    ),
-                  ),
-                ],
-              )
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancelar", style: TextStyle(color: Colors.grey)),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context),
-            style: ElevatedButton.styleFrom(backgroundColor: brandColor, foregroundColor: Colors.white, elevation: 0),
-            child: Text(isEdit ? "Salvar" : "Adicionar"),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _openPersonModal() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.white, 
-        surfaceTintColor: Colors.white,
-        title: const Text("Nova Pessoa"),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text("Crie uma nova categoria para organizar os remédios.", style: TextStyle(fontSize: 13, color: Colors.grey)),
-            const SizedBox(height: 16),
-            _buildTextField(label: "Nome da Pessoa", icon: Icons.person_outline),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancelar", style: TextStyle(color: Colors.grey))),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context),
-            style: ElevatedButton.styleFrom(backgroundColor: brandColor, foregroundColor: Colors.white, elevation: 0),
-            child: const Text("Criar"),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTextField({
-    required String label, 
-    IconData? icon, 
-    TextEditingController? controller, 
-    bool isNumber = false,
-    bool readOnly = false,
-    VoidCallback? onTap
-  }) {
-    return TextField(
-      controller: controller,
-      readOnly: readOnly,
-      onTap: onTap,
-      keyboardType: isNumber ? TextInputType.number : TextInputType.text,
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon, color: Colors.grey),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: Colors.grey[300]!)),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: Colors.grey[300]!)),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-        isDense: true,
       ),
     );
   }
