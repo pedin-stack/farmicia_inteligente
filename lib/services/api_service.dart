@@ -9,6 +9,7 @@ class Remedio {
   final String status;
   final String horario;
   final String proximaCompra;
+  final int? pessoaId;
 
   Remedio({
     this.id,
@@ -18,6 +19,7 @@ class Remedio {
     required this.status,
     required this.horario,
     required this.proximaCompra,
+    this.pessoaId,
   });
 
   factory Remedio.fromJson(Map<String, dynamic> json) {
@@ -30,6 +32,7 @@ class Remedio {
       status: json['status'] ?? 'NORMAL',
       horario: json['horario'] ?? '--:--',
       proximaCompra: json['proximaCompra'] ?? '--/--',
+      pessoaId: json['pessoaId'] ?? json['pessoa'] ?? null,
     );
   }
 
@@ -41,6 +44,37 @@ class Remedio {
       'status': status,
       'horario': horario,
       'proximaCompra': proximaCompra,
+      if (pessoaId != null) 'pessoaId': pessoaId,
+    };
+  }
+}
+
+class Pessoa {
+  final int? id;
+  final String nome;
+  final List<Remedio> remedios;
+
+  Pessoa({this.id, required this.nome, required this.remedios});
+
+  factory Pessoa.fromJson(Map<String, dynamic> json) {
+    List<Remedio> meds = [];
+    if (json['remedios'] is List) {
+      meds = (json['remedios'] as List)
+          .map((e) => Remedio.fromJson(e as Map<String, dynamic>))
+          .toList();
+    }
+    return Pessoa(
+      id: json['id'],
+      nome: json['nome'] ?? 'Sem nome',
+      remedios: meds,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      if (id != null) 'id': id,
+      'nome': nome,
+      'remedios': remedios.map((r) => r.toJson()).toList(),
     };
   }
 }
@@ -48,7 +82,7 @@ class Remedio {
 class ApiService {
   // Se estiver no Emulador Android, use 'http://10.0.2.2:8080'
   // Se estiver na Web, use 'http://localhost:8080'
-  static const String baseUrl = 'http://localhost:8080';
+  static const String baseUrl = 'https://farmacia-back-dm6j.onrender.com';
 
   Future<List<Remedio>> getRemedios() async {
     try {
@@ -56,7 +90,7 @@ class ApiService {
 
       if (response.statusCode == 200) {
         var jsonResponse = jsonDecode(utf8.decode(response.bodyBytes));
-        
+
         List<dynamic> listaParaConverter;
 
         if (jsonResponse is List) {
@@ -66,10 +100,38 @@ class ApiService {
         } else {
           return [];
         }
-        
-        return listaParaConverter.map((item) => Remedio.fromJson(item)).toList();
+
+        return listaParaConverter
+            .map((item) => Remedio.fromJson(item))
+            .toList();
       } else {
         throw Exception('Falha: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Erro de conexão: $e');
+    }
+  }
+
+  Future<List<Pessoa>> getPessoas() async {
+    try {
+      final response = await http.get(Uri.parse('$baseUrl/pessoas'));
+
+      if (response.statusCode == 200) {
+        var jsonResponse = jsonDecode(utf8.decode(response.bodyBytes));
+        List<dynamic> lista;
+        if (jsonResponse is List) {
+          lista = jsonResponse;
+        } else if (jsonResponse is Map && jsonResponse.containsKey('content')) {
+          lista = jsonResponse['content'];
+        } else {
+          return [];
+        }
+
+        return lista
+            .map((p) => Pessoa.fromJson(p as Map<String, dynamic>))
+            .toList();
+      } else {
+        throw Exception('Falha ao buscar pessoas: ${response.statusCode}');
       }
     } catch (e) {
       throw Exception('Erro de conexão: $e');
@@ -89,7 +151,7 @@ class ApiService {
 
   Future<void> deleteRemedio(int id) async {
     final response = await http.delete(Uri.parse('$baseUrl/remedios/$id'));
-    
+
     if (response.statusCode != 204 && response.statusCode != 200) {
       throw Exception('Erro ao deletar: ${response.statusCode}');
     }
@@ -99,24 +161,21 @@ class ApiService {
     try {
       // CORREÇÃO 4: Verifique se sua rota no Java é /auth/login ou /users/login
       // Geralmente em tutoriais Spring Security é /auth/login
-      final url = Uri.parse('$baseUrl/users/login'); 
+      final url = Uri.parse('$baseUrl/users/login');
 
       print("Tentando logar em: $url com $email"); // Debug
 
       final response = await http.post(
         url,
         headers: {"Content-Type": "application/json"},
-        body: jsonEncode({
-          "email": email,
-          "password": senha, 
-        }),
+        body: jsonEncode({"email": email, "password": senha}),
       );
 
       if (response.statusCode == 200) {
-        return true; 
+        return true;
       } else {
         print("Erro Login: ${response.body}"); // Debug para ver o erro real
-        return false; 
+        return false;
       }
     } catch (e) {
       print("Exceção Login: $e");
@@ -130,7 +189,7 @@ class ApiService {
         Uri.parse('$baseUrl/pessoas'),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({
-          "nome": nome, 
+          "nome": nome,
           // Se exigir mais campos (ex: cpf, idade), adicione aqui.
           // Por enquanto, vou mandar só o nome.
         }),
@@ -146,7 +205,7 @@ class ApiService {
 
   Future<void> updateRemedio(Remedio remedio) async {
     final url = Uri.parse('$baseUrl/remedios/${remedio.id}');
-    
+
     final response = await http.put(
       url,
       headers: {"Content-Type": "application/json"},

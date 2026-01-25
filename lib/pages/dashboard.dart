@@ -22,7 +22,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
   // --- Estado e Backend (Lógica do Colega) ---
   final ApiService _apiService = ApiService();
-  List<Remedio> _listaRemedios = []; // Usando o Model dele
+  List<Pessoa> _pessoas = [];
   int _totalPessoasReal = 0;
   bool _isLoading = true;
 
@@ -36,14 +36,12 @@ class _DashboardPageState extends State<DashboardPage> {
   Future<void> _carregarDados() async {
     try {
       setState(() => _isLoading = true);
-      
-      final lista = await _apiService.getRemedios();
-      final qtdPessoas = await _apiService.getQuantidadePessoas(); 
+      final pessoas = await _apiService.getPessoas();
 
       if (mounted) {
         setState(() {
-          _listaRemedios = lista;
-          _totalPessoasReal = qtdPessoas;
+          _pessoas = pessoas;
+          _totalPessoasReal = pessoas.length;
           _isLoading = false;
         });
       }
@@ -57,17 +55,23 @@ class _DashboardPageState extends State<DashboardPage> {
   Future<void> _criarPessoa(String nome) async {
     try {
       // Exibe loading rápido ou feedback
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Salvando pessoa...")));
-      
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Salvando pessoa...")));
+
       await _apiService.createPessoa(nome);
-      
+
       await _carregarDados(); // Atualiza a tela
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Pessoa criada com sucesso!")));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Pessoa criada com sucesso!")),
+        );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Erro: $e"), backgroundColor: Colors.red));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Erro: $e"), backgroundColor: Colors.red),
+        );
       }
     }
   }
@@ -80,14 +84,18 @@ class _DashboardPageState extends State<DashboardPage> {
       } else {
         await _apiService.addRemedio(remedio); // POST
       }
-      
+
       await _carregarDados(); // Refresh
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Medicamento salvo!")));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text("Medicamento salvo!")));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Erro: $e"), backgroundColor: Colors.red));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Erro: $e"), backgroundColor: Colors.red),
+        );
       }
     }
   }
@@ -98,11 +106,18 @@ class _DashboardPageState extends State<DashboardPage> {
       await _apiService.deleteRemedio(id);
       await _carregarDados();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Item removido.")));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text("Item removido.")));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Erro ao deletar: $e"), backgroundColor: Colors.red));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Erro ao deletar: $e"),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
   }
@@ -112,95 +127,140 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   Widget build(BuildContext context) {
     // Cálculos estatísticos baseados na lista real
-    final int totalMedicamentos = _listaRemedios.length;
-    final int totalUrgentes = _listaRemedios.where((r) => r.status?.toUpperCase() == 'URGENTE').length;
+    final int totalMedicamentos = _pessoas.fold<int>(
+      0,
+      (prev, p) => prev + p.remedios.length,
+    );
+    final int totalUrgentes = _pessoas.fold<int>(
+      0,
+      (prev, p) =>
+          prev +
+          p.remedios.where((r) => r.status.toUpperCase() == 'URGENTE').length,
+    );
 
     return Scaffold(
       backgroundColor: bgLight,
       appBar: AppBar(
-        title: const Text("Farmácia Inteligente", style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text(
+          "Farmácia Inteligente",
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black87,
         elevation: 0,
         scrolledUnderElevation: 0,
         actions: [
-          IconButton(icon: const Icon(Icons.logout), onPressed: () => Navigator.pop(context))
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () => Navigator.pop(context),
+          ),
         ],
       ),
       floatingActionButton: const ChatAssistant(),
-      body: _isLoading 
-        ? const Center(child: CircularProgressIndicator()) 
-        : SingleChildScrollView(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text("Visão Geral", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                const Text("Conectado ao servidor", style: TextStyle(color: Colors.grey, fontSize: 14)),
-                const SizedBox(height: 16),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    "Visão Geral",
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  const Text(
+                    "Conectado ao servidor",
+                    style: TextStyle(color: Colors.grey, fontSize: 14),
+                  ),
+                  const SizedBox(height: 16),
 
-                // Cards de Estatísticas
-                Row(
-                  children: [
-                    _buildStatCard("Medicamentos", "$totalMedicamentos", Icons.medication_outlined, brandColor),
-                    const SizedBox(width: 8),
-                    _buildStatCard("Pessoas", "$_totalPessoasReal", Icons.people_outline, successColor),
-                    const SizedBox(width: 8),
-                    _buildStatCard("Urgente", "$totalUrgentes itens", Icons.warning_amber_rounded, errorColor, textColor: errorColor),
-                  ],
-                ),
+                  // Cards de Estatísticas
+                  Row(
+                    children: [
+                      _buildStatCard(
+                        "Medicamentos",
+                        "$totalMedicamentos",
+                        Icons.medication_outlined,
+                        brandColor,
+                      ),
+                      const SizedBox(width: 8),
+                      _buildStatCard(
+                        "Pessoas",
+                        "$_totalPessoasReal",
+                        Icons.people_outline,
+                        successColor,
+                      ),
+                      const SizedBox(width: 8),
+                      _buildStatCard(
+                        "Urgente",
+                        "$totalUrgentes itens",
+                        Icons.warning_amber_rounded,
+                        errorColor,
+                        textColor: errorColor,
+                      ),
+                    ],
+                  ),
 
-                const SizedBox(height: 24),
+                  const SizedBox(height: 24),
 
-                // Botão Nova Pessoa (Usando o Componente AddPersonDialog)
-                Center(
-                  child: SizedBox(
-                    height: 48,
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        showDialog(
-                          context: context,
-                          builder: (context) => AddPersonDialog(
-                            onSave: (nome) {
-                              // Conecta o callback do Dialog à função da API
-                              _criarPessoa(nome); 
-                            },
+                  // Botão Nova Pessoa (Usando o Componente AddPersonDialog)
+                  Center(
+                    child: SizedBox(
+                      height: 48,
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          showDialog(
+                            context: context,
+                            builder: (context) => AddPersonDialog(
+                              onSave: (nome) {
+                                // Conecta o callback do Dialog à função da API
+                                _criarPessoa(nome);
+                              },
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.add),
+                        label: const Text("Nova Pessoa"),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: brandColor,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
                           ),
-                        );
-                      },
-                      icon: const Icon(Icons.add),
-                      label: const Text("Nova Pessoa"),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: brandColor,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
                       ),
                     ),
                   ),
-                ),
 
-                const SizedBox(height: 24),
+                  const SizedBox(height: 24),
 
-                // Lista de Itens (Adaptando a lista plana do backend para o visual de Card)
-                // Nota: Se o backend retornar lista plana, agrupamos visualmente em um card "Geral"
-                // ou iteramos sobre as pessoas se o backend suportar isso. 
-                // Assumindo lista plana de remédios por enquanto:
-                _buildPersonCard({
-                  'nome': 'Estoque Geral',
-                  'itens': _listaRemedios.map((r) => r.toMap()).toList(), // Converte Model -> Map para a Tabela
-                }),
+                  // Renderizar um card por pessoa retornada pela API
+                  for (var pessoa in _pessoas) ...[
+                    const SizedBox(height: 12),
+                    _buildPersonCard({
+                      'id': pessoa.id,
+                      'nome': pessoa.nome,
+                      'itens': pessoa.remedios.map((r) => r.toMap()).toList(),
+                    }),
+                  ],
 
-                const SizedBox(height: 80),
-              ],
+                  const SizedBox(height: 80),
+                ],
+              ),
             ),
-          ),
     );
   }
 
   // --- Widgets Auxiliares ---
 
-  Widget _buildStatCard(String title, String value, IconData icon, Color color, {Color? textColor}) {
+  Widget _buildStatCard(
+    String title,
+    String value,
+    IconData icon,
+    Color color, {
+    Color? textColor,
+  }) {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.all(16),
@@ -208,8 +268,12 @@ class _DashboardPageState extends State<DashboardPage> {
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
-             BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2))
-          ]
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -217,12 +281,25 @@ class _DashboardPageState extends State<DashboardPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Expanded(child: Text(title, style: const TextStyle(color: Colors.grey, fontSize: 11), overflow: TextOverflow.ellipsis)),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(color: Colors.grey, fontSize: 11),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
                 Icon(icon, color: color, size: 18),
               ],
             ),
             const SizedBox(height: 8),
-            Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor ?? Colors.black87)),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: textColor ?? Colors.black87,
+              ),
+            ),
           ],
         ),
       ),
@@ -237,8 +314,12 @@ class _DashboardPageState extends State<DashboardPage> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.grey[200]!),
         boxShadow: [
-           BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 4))
-        ]
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -250,28 +331,44 @@ class _DashboardPageState extends State<DashboardPage> {
                 CircleAvatar(
                   backgroundColor: const Color(0xFF87D068),
                   radius: 18,
-                  child: const Icon(Icons.person, color: Colors.white, size: 20),
+                  child: const Icon(
+                    Icons.person,
+                    color: Colors.white,
+                    size: 20,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Text(pessoa['nome'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  child: Text(
+                    pessoa['nome'],
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
                 ),
                 // Botão Excluir Pessoa (Lógica opcional se houver endpoint para isso)
                 IconButton(
                   icon: const Icon(Icons.delete_outline, color: Colors.red),
                   onPressed: () {
-                     // Adicione lógica de excluir pessoa aqui se o backend suportar
-                     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Funcionalidade em desenvolvimento no backend")));
+                    // Adicione lógica de excluir pessoa aqui se o backend suportar
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          "Funcionalidade em desenvolvimento no backend",
+                        ),
+                      ),
+                    );
                   },
                 ),
               ],
             ),
             const Divider(height: 24),
-            
+
             // Tabela de Remédios
             TabelaRemedios(
               dados: pessoa['itens'],
-              
+
               // 1. ADICIONAR (Abre Dialog -> Converte Map p/ Model -> Chama API)
               onAdd: () {
                 showDialog(
@@ -286,18 +383,23 @@ class _DashboardPageState extends State<DashboardPage> {
                       final novoRemedio = Remedio(
                         nome: novoItemMap['remedio'],
                         quantidade: novoItemMap['quantidade'],
-                        usoDiario: double.tryParse(novoItemMap['consumo'].toString()) ?? 0.0,
+                        usoDiario:
+                            double.tryParse(
+                              novoItemMap['consumo'].toString(),
+                            ) ??
+                            0.0,
                         proximaCompra: novoItemMap['proximaCompra'],
                         horario: novoItemMap['horario'],
                         status: 'NORMAL', // Default
+                        pessoaId: pessoa['id'],
                       );
-                      
+
                       _salvarRemedio(novoRemedio);
                     },
                   ),
                 );
               },
-              
+
               // 2. EDITAR (Abre Dialog com dados -> Converte -> Chama API)
               onEdit: (itemMap) {
                 showDialog(
@@ -306,12 +408,15 @@ class _DashboardPageState extends State<DashboardPage> {
                     nomePessoa: pessoa['nome'],
                     itemParaEditar: itemMap,
                     onSave: (itemEditadoMap) {
-                      
                       final remedioEditado = Remedio(
                         id: itemMap['id'], // IMPORTANTE: Manter o ID original
                         nome: itemEditadoMap['remedio'],
                         quantidade: itemEditadoMap['quantidade'],
-                        usoDiario: double.tryParse(itemEditadoMap['consumo'].toString()) ?? 0.0,
+                        usoDiario:
+                            double.tryParse(
+                              itemEditadoMap['consumo'].toString(),
+                            ) ??
+                            0.0,
                         proximaCompra: itemEditadoMap['proximaCompra'],
                         horario: itemEditadoMap['horario'],
                         status: itemEditadoMap['status'] ?? 'NORMAL',
@@ -322,21 +427,21 @@ class _DashboardPageState extends State<DashboardPage> {
                   ),
                 );
               },
-              
+
               // 3. EXCLUIR (Abre ConfirmDialog -> Chama API)
               onDelete: (itemMap) {
-                 showDialog(
-                    context: context,
-                    builder: (context) => ConfirmExcludeDialog(
-                      titulo: "Remover Medicamento?",
-                      conteudo: "Deseja remover ${itemMap['remedio']} da lista?",
-                      onConfirm: () {
-                        if (itemMap['id'] != null) {
-                          _deletarRemedio(itemMap['id']);
-                        }
-                      },
-                    ),
-                 );
+                showDialog(
+                  context: context,
+                  builder: (context) => ConfirmExcludeDialog(
+                    titulo: "Remover Medicamento?",
+                    conteudo: "Deseja remover ${itemMap['remedio']} da lista?",
+                    onConfirm: () {
+                      if (itemMap['id'] != null) {
+                        _deletarRemedio(itemMap['id']);
+                      }
+                    },
+                  ),
+                );
               },
             ),
           ],
@@ -353,7 +458,8 @@ extension RemedioExtension on Remedio {
       'id': id,
       'remedio': nome,
       'quantidade': quantidade,
-      'consumo': usoDiario, // Mapeando 'usoDiario' do Backend para 'consumo' do Frontend
+      'consumo':
+          usoDiario, // Mapeando 'usoDiario' do Backend para 'consumo' do Frontend
       'proximaCompra': proximaCompra,
       'horario': horario,
       'status': status,
