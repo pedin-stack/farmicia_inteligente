@@ -82,7 +82,7 @@ class Pessoa {
 class ApiService {
   // Se estiver no Emulador Android, use 'http://10.0.2.2:8080'
   // Se estiver na Web, use 'http://localhost:8080'
-  static const String baseUrl = 'https://farmacia-back-dm6j.onrender.com';
+  static const String baseUrl = 'http://localhost:8080';
 
   Future<List<Remedio>> getRemedios() async {
     try {
@@ -231,4 +231,37 @@ class ApiService {
       return 0;
     }
   }
+
+Future<String> enviarMensagemChat(String pergunta) async {
+    try {
+      // 1. Busca os dados atuais para dar contexto à IA
+      List<Remedio> remedios = await getRemedios();
+      
+      // 2. Transforma a lista de remédios em uma String JSON
+      // Isso permite que o Gemini saiba o que tem no estoque
+      String dadosEstoque = jsonEncode(remedios.map((e) => e.toJson()).toList());
+
+      // 3. Monta o DTO esperado pelo Java (ChatRequestDTO)
+      final body = {
+        "pergunta": pergunta,
+        "dadosJson": dadosEstoque
+      };
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/chat'),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode(body),
+      );
+
+      if (response.statusCode == 200) {
+        // O backend retorna a String da resposta diretamente
+        return utf8.decode(response.bodyBytes);
+      } else {
+        return "Desculpe, tive um erro ao processar sua solicitação. (Erro ${response.statusCode})";
+      }
+    } catch (e) {
+      return "Erro de conexão: $e";
+    }
+  }
+
 }
