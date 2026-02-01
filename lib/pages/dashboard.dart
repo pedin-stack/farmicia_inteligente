@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+// Certifique-se de que os caminhos dos imports estão corretos no seu projeto
 import '../widgets/dialogs/AddPersonDialog.dart';
 import '../widgets/dialogs/ConfirmExcludeDialog.dart';
 import '../widgets/dialogs/EditMedicineDialog.dart';
@@ -20,7 +21,7 @@ class _DashboardPageState extends State<DashboardPage> {
   final Color successColor = const Color(0xFF52C41A);
   final Color errorColor = const Color(0xFFCF1322);
 
-  // --- Estado e Backend (Lógica do Colega) ---
+  // --- Estado e Backend ---
   final ApiService _apiService = ApiService();
   List<Pessoa> _pessoas = [];
   int _totalPessoasReal = 0;
@@ -35,7 +36,7 @@ class _DashboardPageState extends State<DashboardPage> {
   // 1. Carregar Dados da API
   Future<void> _carregarDados() async {
     try {
-      setState(() => _isLoading = true);
+      if (mounted) setState(() => _isLoading = true);
       final pessoas = await _apiService.getPessoas();
 
       if (mounted) {
@@ -54,10 +55,7 @@ class _DashboardPageState extends State<DashboardPage> {
   // 2. Criar Pessoa na API
   Future<void> _criarPessoa(String nome) async {
     try {
-      // Exibe loading rápido ou feedback
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Salvando pessoa...")));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Salvando pessoa...")));
 
       await _apiService.createPessoa(nome);
 
@@ -87,9 +85,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
       await _carregarDados(); // Refresh
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text("Medicamento salvo!")));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Medicamento salvo!")));
       }
     } catch (e) {
       if (mounted) {
@@ -106,17 +102,12 @@ class _DashboardPageState extends State<DashboardPage> {
       await _apiService.deleteRemedio(id);
       await _carregarDados();
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text("Item removido.")));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Item removido.")));
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Erro ao deletar: $e"),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text("Erro ao deletar: $e"), backgroundColor: Colors.red),
         );
       }
     }
@@ -126,7 +117,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
   @override
   Widget build(BuildContext context) {
-    // Cálculos estatísticos baseados na lista real
+    // Cálculos estatísticos
     final int totalMedicamentos = _pessoas.fold<int>(
       0,
       (prev, p) => prev + p.remedios.length,
@@ -203,7 +194,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
                   const SizedBox(height: 24),
 
-                  // Botão Nova Pessoa (Usando o Componente AddPersonDialog)
+                  // Botão Nova Pessoa
                   Center(
                     child: SizedBox(
                       height: 48,
@@ -214,7 +205,6 @@ class _DashboardPageState extends State<DashboardPage> {
                             context: context,
                             builder: (context) => AddPersonDialog(
                               onSave: (nome) {
-                                // Conecta o callback do Dialog à função da API
                                 _criarPessoa(nome);
                               },
                             ),
@@ -235,7 +225,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
                   const SizedBox(height: 24),
 
-                  // Renderizar um card por pessoa retornada pela API
+                  // Renderizar um card por pessoa
                   for (var pessoa in _pessoas) ...[
                     const SizedBox(height: 12),
                     _buildPersonCard({
@@ -347,16 +337,12 @@ class _DashboardPageState extends State<DashboardPage> {
                     ),
                   ),
                 ),
-                // Botão Excluir Pessoa (Lógica opcional se houver endpoint para isso)
                 IconButton(
                   icon: const Icon(Icons.delete_outline, color: Colors.red),
                   onPressed: () {
-                    // Adicione lógica de excluir pessoa aqui se o backend suportar
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                        content: Text(
-                          "Funcionalidade em desenvolvimento no backend",
-                        ),
+                        content: Text("Funcionalidade em desenvolvimento no backend"),
                       ),
                     );
                   },
@@ -367,9 +353,9 @@ class _DashboardPageState extends State<DashboardPage> {
 
             // Tabela de Remédios
             TabelaRemedios(
-              dados: pessoa['itens'],
+              dados: pessoa['itens'], // Passa a lista convertida pelo toMap
 
-              // 1. ADICIONAR (Abre Dialog -> Converte Map p/ Model -> Chama API)
+              // 1. ADICIONAR
               onAdd: () {
                 showDialog(
                   context: context,
@@ -377,20 +363,14 @@ class _DashboardPageState extends State<DashboardPage> {
                     nomePessoa: pessoa['nome'],
                     itemParaEditar: null,
                     onSave: (novoItemMap) {
-                      // Conversão Map -> Model Remedio
-                      // O EditMedicineDialog retorna um Map com strings/ints.
-                      // Precisamos garantir que o Model do seu colega aceite isso.
+                      // Correção: Usando chaves 'nome' e 'usoDiario' padronizadas
                       final novoRemedio = Remedio(
-                        nome: novoItemMap['remedio'],
+                        nome: novoItemMap['nome'], 
                         quantidade: novoItemMap['quantidade'],
-                        usoDiario:
-                            double.tryParse(
-                              novoItemMap['consumo'].toString(),
-                            ) ??
-                            0.0,
+                        usoDiario: double.tryParse(novoItemMap['usoDiario'].toString()) ?? 0.0,
                         proximaCompra: novoItemMap['proximaCompra'],
                         horario: novoItemMap['horario'],
-                        status: 'NORMAL', // Default
+                        status: 'NORMAL',
                         pessoaId: pessoa['id'],
                       );
 
@@ -400,26 +380,24 @@ class _DashboardPageState extends State<DashboardPage> {
                 );
               },
 
-              // 2. EDITAR (Abre Dialog com dados -> Converte -> Chama API)
+              // 2. EDITAR
               onEdit: (itemMap) {
                 showDialog(
                   context: context,
                   builder: (context) => EditMedicineDialog(
                     nomePessoa: pessoa['nome'],
-                    itemParaEditar: itemMap,
+                    // O itemMap aqui vem do toMap(), então já tem as chaves certas ('nome', 'usoDiario')
+                    itemParaEditar: itemMap, 
                     onSave: (itemEditadoMap) {
                       final remedioEditado = Remedio(
-                        id: itemMap['id'], // IMPORTANTE: Manter o ID original
-                        nome: itemEditadoMap['remedio'],
+                        id: itemMap['id'],
+                        nome: itemEditadoMap['nome'],
                         quantidade: itemEditadoMap['quantidade'],
-                        usoDiario:
-                            double.tryParse(
-                              itemEditadoMap['consumo'].toString(),
-                            ) ??
-                            0.0,
+                        usoDiario: double.tryParse(itemEditadoMap['usoDiario'].toString()) ?? 0.0,
                         proximaCompra: itemEditadoMap['proximaCompra'],
                         horario: itemEditadoMap['horario'],
                         status: itemEditadoMap['status'] ?? 'NORMAL',
+                        pessoaId: pessoa['id'], // Mantém o ID da pessoa
                       );
 
                       _salvarRemedio(remedioEditado);
@@ -428,13 +406,14 @@ class _DashboardPageState extends State<DashboardPage> {
                 );
               },
 
-              // 3. EXCLUIR (Abre ConfirmDialog -> Chama API)
+              // 3. EXCLUIR
               onDelete: (itemMap) {
                 showDialog(
                   context: context,
                   builder: (context) => ConfirmExcludeDialog(
                     titulo: "Remover Medicamento?",
-                    conteudo: "Deseja remover ${itemMap['remedio']} da lista?",
+                    // Correção: Usando chave 'nome'
+                    conteudo: "Deseja remover ${itemMap['nome']} da lista?",
                     onConfirm: () {
                       if (itemMap['id'] != null) {
                         _deletarRemedio(itemMap['id']);
@@ -451,15 +430,16 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 }
 
-// Extensão para facilitar a conversão Model -> Map (se seu colega não fez isso no model)
+// Extensão corrigida para padronizar as chaves em todo o app
 extension RemedioExtension on Remedio {
   Map<String, dynamic> toMap() {
     return {
       'id': id,
-      'remedio': nome,
+      'nome': nome, 
+      'remedio': nome, // Mantém a chave 'remedio' para compatibilidade com o backend
       'quantidade': quantidade,
-      'consumo':
-          usoDiario, // Mapeando 'usoDiario' do Backend para 'consumo' do Frontend
+      'usoDiario': usoDiario,
+      'consumo': usoDiario, // Mantém a chave 'consumo' para compatibilidade com o backend
       'proximaCompra': proximaCompra,
       'horario': horario,
       'status': status,
