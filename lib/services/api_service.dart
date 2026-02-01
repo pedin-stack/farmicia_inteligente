@@ -151,7 +151,7 @@ class Pessoa {
 }
 
 class ApiService {
-  static const String baseUrl = 'http://localhost:8080';
+  static const String baseUrl = 'https://farmacia-back-dm6j.onrender.com';
 
   Future<List<Remedio>> getRemedios() async {
     try {

@@ -16,7 +16,6 @@ class _ChatAssistantState extends State<ChatAssistant> {
   bool isOpen = false;
   bool isLoading = false;
 
-  // Lista de mensagens para exibir na tela
   List<Map<String, dynamic>> messages = [
     {"role": "bot", "text": "Olá! Sou seu assistente farmacêutico. Posso analisar seu estoque. Pergunte algo como:\n'Quais remédios estão acabando?'"}
   ];

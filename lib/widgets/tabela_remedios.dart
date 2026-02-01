@@ -19,63 +19,130 @@ class TabelaRemedios extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: DataTable(
-            columnSpacing: 10,
-            horizontalMargin: 4,
-            headingRowHeight: 40,
-            dataRowMinHeight: 48,
-            dataRowMaxHeight: 60,
-            columns: const [
-              DataColumn(label: Text('Remédio', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
-              DataColumn(label: Text('Qtd.', textAlign: TextAlign.center, style: TextStyle(fontSize: 13))),
-              DataColumn(label: Text('Data', style: TextStyle(fontSize: 13))),
-              DataColumn(label: Text('Hora', style: TextStyle(fontSize: 13))),
-              DataColumn(label: Text('Ações', textAlign: TextAlign.right, style: TextStyle(fontSize: 13))),
-            ],
-            rows: dados.map((item) {
-              return DataRow(cells: [
-                // CORREÇÃO 1: Procura 'nome' (Backend) ou 'remedio' (Legado)
-                DataCell(
-                  SizedBox(
-                    width: 85,
-                    child: Text(
-                      item['nome'] ?? item['remedio'] ?? '', 
-                      style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+        LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                child: DataTable(
+                  columnSpacing: 10,
+                  horizontalMargin: 4,
+                  headingRowHeight: 40,
+                  dataRowMinHeight: 48,
+                  dataRowMaxHeight: 60,
+                  columns: const [
+                    DataColumn(
+                      label: Text(
+                        'Remédio',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-                DataCell(Center(child: Text(item['quantidade']?.toString() ?? '-', style: const TextStyle(fontSize: 13)))),
-                DataCell(_buildStatusTag(item['proximaCompra'] ?? item['proxCompra'], item['status'])), // Suporte a proxCompra vindo do DTO
-                DataCell(Text(item['horario'] ?? '-', style: const TextStyle(fontSize: 12))),
-                DataCell(
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.edit_outlined, color: Colors.blue, size: 20),
-                        onPressed: () => onEdit?.call(item),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
-                        splashRadius: 20,
+                    DataColumn(
+                      label: Text(
+                        'Qtd.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 13),
                       ),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
-                        onPressed: () => onDelete?.call(item),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
-                        splashRadius: 20,
+                    ),
+                    DataColumn(
+                      label: Text('Data', style: TextStyle(fontSize: 13)),
+                    ),
+                    DataColumn(
+                      label: Text('Hora', style: TextStyle(fontSize: 13)),
+                    ),
+                    DataColumn(
+                      label: Text(
+                        'Ações',
+                        textAlign: TextAlign.right,
+                        style: TextStyle(fontSize: 13),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
+                  rows: dados.map((item) {
+                    return DataRow(
+                      cells: [
+                        // CORREÇÃO 1: Procura 'nome' (Backend) ou 'remedio' (Legado)
+                        DataCell(
+                          SizedBox(
+                            width: 85,
+                            child: Text(
+                              item['nome'] ?? item['remedio'] ?? '',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w500,
+                                fontSize: 13,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                        DataCell(
+                          Center(
+                            child: Text(
+                              item['quantidade']?.toString() ?? '-',
+                              style: const TextStyle(fontSize: 13),
+                            ),
+                          ),
+                        ),
+                        DataCell(
+                          _buildStatusTag(
+                            item['proximaCompra'] ?? item['proxCompra'],
+                            item['status'],
+                          ),
+                        ), // Suporte a proxCompra vindo do DTO
+                        DataCell(
+                          Text(
+                            item['horario'] ?? '-',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                        ),
+                        DataCell(
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.edit_outlined,
+                                  color: Colors.blue,
+                                  size: 20,
+                                ),
+                                onPressed: () => onEdit?.call(item),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(
+                                  minWidth: 24,
+                                  minHeight: 24,
+                                ),
+                                splashRadius: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.delete_outline,
+                                  color: Colors.red,
+                                  size: 20,
+                                ),
+                                onPressed: () => onDelete?.call(item),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(
+                                  minWidth: 24,
+                                  minHeight: 24,
+                                ),
+                                splashRadius: 20,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    );
+                  }).toList(),
                 ),
-              ]);
-            }).toList(),
-          ),
+              ),
+            );
+          },
         ),
         const SizedBox(height: 10),
         OutlinedButton.icon(
@@ -87,7 +154,7 @@ class TabelaRemedios extends StatelessWidget {
             side: BorderSide(color: Colors.grey[300]!),
             foregroundColor: Colors.black87,
           ),
-        )
+        ),
       ],
     );
   }
@@ -119,7 +186,11 @@ class TabelaRemedios extends StatelessWidget {
       ),
       child: Text(
         text ?? '-',
-        style: TextStyle(color: textColor, fontSize: 10, fontWeight: FontWeight.bold),
+        style: TextStyle(
+          color: textColor,
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+        ),
         textAlign: TextAlign.center,
       ),
     );
